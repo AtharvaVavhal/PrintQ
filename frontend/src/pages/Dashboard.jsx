@@ -11,9 +11,8 @@ import { connectSocket } from '../lib/socket';
 const COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#8b5cf6'];
 
 export default function Dashboard() {
-  const [stats, setStats]   = useState(null);
-  const [jobs, setJobs]     = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
     fetchData();
@@ -24,45 +23,39 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const { data } = await api.get('/jobs?limit=100');
-      const jobs = data.jobs || [];
-      setJobs(jobs);
-
-      // Compute stats
-      const total    = jobs.length;
-      const completed = jobs.filter(j => j.status === 'completed').length;
-      const queued   = jobs.filter(j => j.status === 'queued').length;
-      const revenue  = jobs
-        .filter(j => ['queued','processing','printing','completed'].includes(j.status))
-        .reduce((sum, j) => sum + j.amount_paise, 0);
-
-      setStats({ total, completed, queued, revenue });
+      const { data } = await api.get('/admin/analytics?days=7');
+      setAnalytics(data);
     } finally {
       setLoading(false);
     }
   };
 
-  // Build last 7 days chart data
+  const summary    = analytics?.summary    || {};
+  const daily      = analytics?.daily      || [];
+  const statusDist = analytics?.statusDist || [];
+
+  // Normalise daily data so all 7 days appear even with no jobs
   const chartData = Array.from({ length: 7 }, (_, i) => {
     const date  = subDays(new Date(), 6 - i);
     const label = format(date, 'MMM d');
-    const dayJobs = jobs.filter(j =>
-      format(new Date(j.created_at), 'MMM d') === label
-    );
+    const day   = daily.find(d => format(new Date(d.date), 'MMM d') === label) || {};
     return {
-      date: label,
-      jobs:    dayJobs.length,
-      revenue: dayJobs.reduce((s, j) => s + j.amount_paise / 100, 0),
+      date:    label,
+      jobs:    parseInt(day.jobs    || '0', 10),
+      revenue: parseInt(day.revenue_paise || '0', 10) / 100,
     };
   });
 
-  // Status distribution for pie chart
-  const statusData = ['pending_payment','queued','printing','completed','failed']
-    .map(s => ({
-      name:  s.replace(/_/g,' '),
-      value: jobs.filter(j => j.status === s).length,
-    }))
+  const statusData = statusDist
+    .map(d => ({ name: d.status.replace(/_/g, ' '), value: parseInt(d.count, 10) }))
     .filter(d => d.value > 0);
+
+  const stats = {
+    total:     parseInt(summary.total_jobs          || '0', 10),
+    completed: parseInt(summary.completed_jobs      || '0', 10),
+    queued:    parseInt(summary.active_jobs         || '0', 10),
+    revenue:   parseInt(summary.total_revenue_paise || '0', 10),
+  };
 
   if (loading) return <div style={{ color: '#64748b' }}>Loading dashboard...</div>;
 
@@ -78,10 +71,10 @@ export default function Dashboard() {
       {/* Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '28px' }}>
         {[
-          { label: 'Total Jobs',   value: stats?.total,                  icon: '📋', color: '#6366f1' },
-          { label: 'Completed',    value: stats?.completed,              icon: '✅', color: '#22c55e' },
-          { label: 'In Queue',     value: stats?.queued,                 icon: '⏳', color: '#f59e0b' },
-          { label: 'Revenue',      value: `₹${((stats?.revenue||0)/100).toFixed(0)}`, icon: '💰', color: '#8b5cf6' },
+          { label: 'Total Jobs',   value: stats.total,                              icon: '📋', color: '#6366f1' },
+          { label: 'Completed',    value: stats.completed,                           icon: '✅', color: '#22c55e' },
+          { label: 'Active',       value: stats.queued,                              icon: '⏳', color: '#f59e0b' },
+          { label: 'Revenue',      value: `₹${(stats.revenue / 100).toFixed(0)}`,  icon: '💰', color: '#8b5cf6' },
         ].map(({ label, value, icon, color }) => (
           <div key={label} style={{
             background: 'white', borderRadius: '12px', padding: '20px',
@@ -95,12 +88,30 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Extra summary pills */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
+        {[
+          { label: 'Pages Printed', value: parseInt(summary.total_pages_printed || '0', 10).toLocaleString() },
+          { label: 'Failed Jobs',   value: parseInt(summary.failed_jobs         || '0', 10) },
+          { label: 'Refunded',      value: `₹${(parseInt(summary.total_refunded_paise || '0', 10) / 100).toFixed(0)}` },
+          { label: 'Avg Job Value', value: `₹${(parseInt(summary.avg_job_value_paise  || '0', 10) / 100).toFixed(2)}` },
+        ].map(({ label, value }) => (
+          <div key={label} style={{
+            background: 'white', borderRadius: '8px', padding: '10px 18px',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', gap: '10px', alignItems: 'center'
+          }}>
+            <span style={{ fontWeight: 700, color: '#1e293b' }}>{value}</span>
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{label}</span>
+          </div>
+        ))}
+      </div>
+
       {/* Charts Row */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px', marginBottom: '28px' }}>
         {/* Area Chart */}
         <div style={{ background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', marginBottom: '16px' }}>
-            Jobs & Revenue (Last 7 Days)
+            Jobs (Last 7 Days)
           </h3>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={chartData}>
@@ -112,7 +123,7 @@ export default function Dashboard() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
               <Tooltip />
               <Area type="monotone" dataKey="jobs" stroke="#6366f1"
                 fill="url(#colorJobs)" strokeWidth={2} name="Jobs" />
@@ -123,7 +134,7 @@ export default function Dashboard() {
         {/* Pie Chart */}
         <div style={{ background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', marginBottom: '16px' }}>
-            Job Status Distribution
+            Status Distribution
           </h3>
           {statusData.length > 0 ? (
             <>

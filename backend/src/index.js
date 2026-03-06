@@ -18,6 +18,9 @@ const healthRouter = require('./routes/health');
 const authRouter   = require('./routes/auth');
 const jobsRouter     = require('./routes/jobs');
 const paymentsRouter = require('./routes/payments');
+const adminRouter    = require('./routes/admin');
+const printersRouter = require('./routes/printers');
+const bridgeRouter   = require('./routes/bridge');
 
 // Ensure upload directory exists
 const uploadDir = process.env.UPLOAD_DIR || './uploads';
@@ -58,8 +61,9 @@ app.use('/api/auth', authRouter);
 app.use('/api/jobs', jobsRouter);
 
 app.use('/api/payments', paymentsRouter);
-app.use('/api/printers', (req, res) => res.json({ message: 'Printer routes — Day 9' }));
-app.use('/api/admin',    (req, res) => res.json({ message: 'Admin routes — Day 7' }));
+app.use('/api/printers', printersRouter);
+app.use('/api/bridge',   bridgeRouter);
+app.use('/api/admin',    adminRouter);
 
 io.on('connection', (socket) => {
   console.log(`[Socket.IO] Client connected: ${socket.id}`);
@@ -90,5 +94,4 @@ httpServer.listen(PORT, () => {
 process.on('SIGTERM', () => {
   httpServer.close(() => process.exit(0));
 });
-
 module.exports = { app, io };

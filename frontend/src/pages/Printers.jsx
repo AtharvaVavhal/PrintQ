@@ -21,20 +21,8 @@ export default function Printers() {
 
   const fetchPrinters = async () => {
     try {
-      // Using direct DB query via health-adjacent endpoint
-      // In production this would be GET /api/admin/printers
-      const { data } = await api.get('/printers');
-      // Printers endpoint is stub for now — show mock data
-      setPrinters([
-        {
-          id: '496c3eda-04b6-4390-a923-406bdc13b4e7',
-          name: 'Main Library Printer',
-          location: 'Library - Ground Floor',
-          status: 'offline',
-          capabilities: { color: true, duplex: true, max_pages: 100 },
-          last_heartbeat: null,
-        }
-      ]);
+      const { data } = await api.get('/admin/printers');
+      setPrinters(data.printers || []);
     } catch {
       setPrinters([]);
     } finally {
@@ -97,6 +85,23 @@ export default function Printers() {
                   {printer.last_heartbeat
                     ? `Last seen: ${formatDistanceToNow(new Date(printer.last_heartbeat))} ago`
                     : 'Never connected'}
+                </div>
+
+                {/* Job stats */}
+                <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    📋 {printer.total_jobs || 0} total jobs
+                  </span>
+                  {parseInt(printer.queued_jobs || '0', 10) > 0 && (
+                    <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600 }}>
+                      ⏳ {printer.queued_jobs} queued
+                    </span>
+                  )}
+                  {parseInt(printer.active_jobs || '0', 10) > 0 && (
+                    <span style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 600 }}>
+                      🖨️ {printer.active_jobs} printing
+                    </span>
+                  )}
                 </div>
 
                 {/* Printer ID */}
