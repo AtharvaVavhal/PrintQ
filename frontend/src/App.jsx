@@ -1,35 +1,46 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
+import { useAuth } from './hooks/useAuth';
 
-function App() {
-  const [count, setCount] = useState(0)
+import Layout    from './components/Layout';
+import Login     from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Jobs      from './pages/Jobs';
+import Printers  from './pages/Printers';
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+const queryClient = new QueryClient();
+
+function ProtectedRoute({ children }) {
+  const { admin, loading } = useAuth();
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '100vh', color: '#64748b', fontSize: '1rem' }}>
+      Loading...
+    </div>
+  );
+  return admin ? children : <Navigate to="/login" replace />;
 }
 
-export default App
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Toaster position="top-right" />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }>
+            <Route index        element={<Dashboard />} />
+            <Route path="jobs"     element={<Jobs />} />
+            <Route path="printers" element={<Printers />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}
