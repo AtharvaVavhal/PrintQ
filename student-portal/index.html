@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#6366f1" />
+  <title>PrintQ — College Printing</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="/icons/icon-192.png" />
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="/jsqr.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:   #6366f1;
+      --primary-d: #4f46e5;
+      --success:   #22c55e;
+      --warning:   #f59e0b;
+      --danger:    #ef4444;
+      --bg:        #f8fafc;
+      --card:      #ffffff;
+      --text:      #1e293b;
+      --muted:     #64748b;
+      --border:    #e2e8f0;
+      --radius:    12px;
+      --shadow:    0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; }
+    header p  { font-size: 0.75rem; opacity: 0.85; margin-top: 1px; }
+    .header-icon { font-size: 1.8rem; }
+
+    /* ── Screens ── */
+    .screen { display: none; padding: 20px; max-width: 480px; margin: 0 auto; }
+    .screen.active { display: block; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── Drop Zone ── */
+    #dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--bg);
+    }
+    #dropzone:hover, #dropzone.dragover {
+      border-color: var(--primary);
+      background: #eef2ff;
+    }
+    #dropzone .dz-icon  { font-size: 3rem; margin-bottom: 12px; }
+    #dropzone .dz-text  { font-size: 0.95rem; color: var(--muted); }
+    #dropzone .dz-hint  { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+    #dropzone.has-file  { border-color: var(--success); background: #f0fdf4; }
+    #file-input { display: none; }
+
+    /* ── File Info ── */
+    #file-info {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #f0fdf4;
+      border-radius: 8px;
+      margin-top: 12px;
+      border: 1px solid #bbf7d0;
+    }
+    #file-info.show { display: flex; }
+    .file-icon { font-size: 1.5rem; }
+    .file-details { flex: 1; }
+    .file-name { font-weight: 600; font-size: 0.9rem; word-break: break-all; }
+    .file-size { font-size: 0.75rem; color: var(--muted); }
+    .file-remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--danger);
+      font-size: 1.2rem;
+      padding: 4px;
+    }
+
+    /* ── Form Controls ── */
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .form-group { margin-bottom: 12px; }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    input[type="email"],
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: white;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    /* ── Toggle Switch ── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .toggle-row:last-child { border-bottom: none; }
+    .toggle-label { font-size: 0.9rem; font-weight: 500; }
+    .toggle-desc  { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 24px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .toggle-slider:before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      top: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle input:checked + .toggle-slider { background: var(--primary); }
+    .toggle input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+    /* ── Cost Preview ── */
+    #cost-preview {
+      display: none;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+    #cost-preview.show { display: block; }
+    .cost-amount {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    .cost-label { font-size: 0.85rem; opacity: 0.85; margin-bottom: 8px; }
+    .cost-breakdown {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .cost-pill {
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      backdrop-filter: blur(4px);
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary  { background: var(--primary); color: white; }
+    .btn-primary:hover:not(:disabled)  { background: var(--primary-d); transform: translateY(-1px); }
+    .btn-success  { background: var(--success); color: white; }
+    .btn-outline  {
+      background: transparent;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+    .btn-sm {
+      width: auto;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+    }
+
+    /* ── Status Badge ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .badge-pending  { background: #fef3c7; color: #92400e; }
+    .badge-queued   { background: #dbeafe; color: #1e40af; }
+    .badge-printing { background: #e0e7ff; color: #3730a3; }
+    .badge-complete { background: #dcfce7; color: #166534; }
+    .badge-failed   { background: #fee2e2; color: #991b1b; }
+    .badge-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+    /* ── QR Code Screen ── */
+    #qr-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      text-align: center;
+    }
+    #qr-canvas {
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      margin: 16px 0;
+    }
+    .qr-job-id {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+      background: var(--bg);
+      padding: 6px 12px;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+
+    /* ── Scanner ── */
+    #scanner-container {
+      position: relative;
+      width: 100%;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: black;
+      aspect-ratio: 1;
+    }
+    #scanner-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .scanner-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .scanner-frame {
+      width: 65%;
+      aspect-ratio: 1;
+      border: 3px solid var(--primary);
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { border-color: var(--primary); }
+      50%       { border-color: white; }
+    }
+    #scanner-canvas { display: none; }
+
+    /* ── Status Timeline ── */
+    .timeline { padding: 8px 0; }
+    .timeline-item {
+      display: flex;
+      gap: 16px;
+      padding: 12px 0;
+      position: relative;
+    }
+    .timeline-item:not(:last-child):before {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 36px;
+      bottom: -12px;
+      width: 2px;
+      background: var(--border);
+    }
+    .timeline-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+      background: var(--border);
+      color: var(--muted);
+    }
+    .timeline-dot.done    { background: var(--success); color: white; }
+    .timeline-dot.active  { background: var(--primary); color: white; }
+    .timeline-dot.failed  { background: var(--danger);  color: white; }
+    .timeline-content { flex: 1; padding-top: 4px; }
+    .timeline-title   { font-weight: 600; font-size: 0.9rem; }
+    .timeline-time    { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 12px 20px;
+      border-radius: 10px;
+      color: white;
+      font-size: 0.9rem;
+      font-weight: 500;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      animation: slideUp 0.3s ease;
+      white-space: nowrap;
+    }
+    .toast-success { background: var(--success); }
+    .toast-error   { background: var(--danger); }
+    .toast-info    { background: var(--primary); }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    /* ── Loading Spinner ── */
+    .spinner {
+      width: 20px; height: 20px;
+      border: 3px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Bottom Nav ── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding: 8px 0 env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px;
+      cursor: pointer;
+      color: var(--muted);
+      transition: color 0.2s;
+      background: none;
+      border: none;
+      font-family: inherit;
+    }
+    .nav-item.active { color: var(--primary); }
+    .nav-icon  { font-size: 1.3rem; }
+    .nav-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+
+    .pb-nav { padding-bottom: 80px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-icon">🖨️</div>
+  <div>
+    <h1>PrintQ</h1>
+    <p>College Printing System</p>
+  </div>
+</header>
+
+<!-- ── SCREEN 1: Upload ─────────────────────────────── -->
+<div id="screen-upload" class="screen active pb-nav">
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">📄 Upload Document</div>
+    <div id="dropzone" onclick="document.getElementById('file-input').click()">
+      <div class="dz-icon">📁</div>
+      <div class="dz-text">Tap to select or drag & drop</div>
+      <div class="dz-hint">PDF or DOCX — max 50MB</div>
+    </div>
+    <input type="file" id="file-input" accept=".pdf,.docx" />
+
+    <div id="file-info">
+      <div class="file-icon">📄</div>
+      <div class="file-details">
+        <div class="file-name" id="file-name-text"></div>
+        <div class="file-size" id="file-size-text"></div>
+      </div>
+      <button class="file-remove" onclick="removeFile()">✕</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">👤 Student Details</div>
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" id="student-email" placeholder="student@college.edu" />
+    </div>
+    <div class="form-group">
+      <label>Name (optional)</label>
+      <input type="text" id="student-name" placeholder="Your name" />
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚙️ Print Settings</div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Copies</label>
+        <input type="number" id="copies" value="1" min="1" max="20" />
+      </div>
+      <div class="form-group">
+        <label>Paper Size</label>
+        <select id="paper-size">
+          <option value="A4">A4</option>
+          <option value="A3">A3</option>
+          <option value="Letter">Letter</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">🎨 Color Printing</div>
+        <div class="toggle-desc">Full color vs black & white</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="color" onchange="updateCost()" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">📋 Double Sided</div>
+        <div class="toggle-desc">Print on both sides</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="duplex" onchange="updateCost()" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div id="cost-preview">
+    <div class="cost-label">Estimated Cost</div>
+    <div class="cost-amount">₹<span id="cost-amount">0.00</span></div>
+    <div class="cost-breakdown" id="cost-breakdown"></div>
+  </div>
+
+  <button class="btn btn-primary" id="upload-btn" onclick="uploadFile()" disabled>
+    Upload & Get Cost
+  </button>
+</div>
+
+<!-- ── SCREEN 2: Payment ────────────────────────────── -->
+<div id="screen-payment" class="screen pb-nav">
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">💳 Payment Summary</div>
+    <div id="payment-details"></div>
+  </div>
+  <button class="btn btn-primary" id="pay-btn" onclick="initiatePayment()">
+    💳 Pay with Razorpay
+  </button>
+  <button class="btn btn-outline" style="margin-top:12px" onclick="showScreen('upload')">
+    ← Back
+  </button>
+</div>
+
+<!-- ── SCREEN 3: QR Code ────────────────────────────── -->
+<div id="screen-qr" class="screen pb-nav">
+  <div class="card" style="margin-top:16px">
+    <div id="qr-container">
+      <div style="font-size:1.1rem;font-weight:600">Your Print QR Code</div>
+      <p style="color:var(--muted);font-size:0.85rem;margin-top:6px">
+        Show this at the printer to collect your printout
+      </p>
+      <canvas id="qr-canvas" width="240" height="240"></canvas>
+      <div class="qr-job-id" id="qr-job-id"></div>
+      <div id="job-status-badge" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📡 Live Status</div>
+    <div class="timeline" id="status-timeline"></div>
+  </div>
+
+  <button class="btn btn-outline" onclick="showScreen('upload')" style="margin-bottom:20px">
+    + New Print Job
+  </button>
+</div>
+
+<!-- ── SCREEN 4: Scanner ────────────────────────────── -->
+<div id="screen-scanner" class="screen pb-nav">
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">📷 Scan QR Code</div>
+    <div id="scanner-container">
+      <video id="scanner-video" autoplay playsinline muted></video>
+      <div class="scanner-overlay">
+        <div class="scanner-frame"></div>
+      </div>
+    </div>
+    <canvas id="scanner-canvas"></canvas>
+    <p style="text-align:center;color:var(--muted);font-size:0.85rem;margin-top:12px">
+      Point camera at the QR code on screen
+    </p>
+  </div>
+
+  <div id="scan-result" style="display:none">
+    <div class="card">
+      <div class="card-title">✅ Scan Result</div>
+      <div id="scan-result-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Bottom Navigation ──────────────────────────── -->
+<nav class="bottom-nav">
+  <button class="nav-item active" id="nav-upload" onclick="showScreen('upload')">
+    <span class="nav-icon">📤</span>
+    <span class="nav-label">Upload</span>
+  </button>
+  <button class="nav-item" id="nav-payment" onclick="showScreen('payment')">
+    <span class="nav-icon">💳</span>
+    <span class="nav-label">Payment</span>
+  </button>
+  <button class="nav-item" id="nav-qr" onclick="showScreen('qr')">
+    <span class="nav-icon">🔲</span>
+    <span class="nav-label">QR Code</span>
+  </button>
+  <button class="nav-item" id="nav-scanner" onclick="startScanner()">
+    <span class="nav-icon">📷</span>
+    <span class="nav-label">Scanner</span>
+  </button>
+</nav>
+
+<!-- ── Toast Container ───────────────────────────── -->
+<div id="toast-container"></div>
+
+<script>
+// ─── Config ──────────────────────────────────────────────────────────────────
+const API = 'http://localhost:4000/api';
+const SOCKET_URL = 'http://localhost:4000';
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let state = {
+  file:        null,
+  jobId:       null,
+  qrToken:     null,
+  orderId:     null,
+  amountPaise: 0,
+  pageCount:   0,
+  socket:      null,
+  scannerStream: null,
+  scannerInterval: null,
+};
+
+// ─── Screen Navigation ────────────────────────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`screen-${name}`).classList.add('active');
+  document.getElementById(`nav-${name}`)?.classList.add('active');
+  if (name !== 'scanner') stopScanner();
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info', duration = 3500) {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+// ─── File Handling ────────────────────────────────────────────────────────────
+const dropzone  = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) setFile(file);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) setFile(fileInput.files[0]);
+});
+
+function setFile(file) {
+  const allowed = ['application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+  if (!allowed.includes(file.type) && !file.name.match(/\.(pdf|docx)$/i)) {
+    toast('Only PDF and DOCX files are accepted.', 'error');
+    return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    toast('File too large. Maximum size is 50MB.', 'error');
+    return;
+  }
+  state.file = file;
+  dropzone.classList.add('has-file');
+  document.getElementById('file-name-text').textContent = file.name;
+  document.getElementById('file-size-text').textContent = formatBytes(file.size);
+  document.getElementById('file-info').classList.add('show');
+  document.getElementById('dropzone').querySelector('.dz-text').textContent = 'File selected ✓';
+  document.getElementById('upload-btn').disabled = false;
+  updateCost();
+}
+
+function removeFile() {
+  state.file = null;
+  fileInput.value = '';
+  dropzone.classList.remove('has-file');
+  document.getElementById('file-info').classList.remove('show');
+  document.getElementById('dropzone').querySelector('.dz-text').textContent = 'Tap to select or drag & drop';
+  document.getElementById('upload-btn').disabled = true;
+  document.getElementById('cost-preview').classList.remove('show');
+}
+
+// ─── Cost Preview (client-side estimate) ─────────────────────────────────────
+function updateCost() {
+  if (!state.file || !state.pageCount) return;
+  const copies = parseInt(document.getElementById('copies').value) || 1;
+  const color  = document.getElementById('color').checked;
+  const duplex = document.getElementById('duplex').checked;
+
+  const BW_SINGLE = 150, BW_DOUBLE = 100, COLOR_SINGLE = 500, COLOR_DOUBLE = 400;
+  let rate;
+  if (color && duplex)        rate = COLOR_DOUBLE;
+  else if (color && !duplex)  rate = COLOR_SINGLE;
+  else if (!color && duplex)  rate = BW_DOUBLE;
+  else                        rate = BW_SINGLE;
+
+  const sheets = duplex ? Math.ceil(state.pageCount / 2) : state.pageCount;
+  const totalPaise = sheets * copies * rate;
+  const totalRupees = (totalPaise / 100).toFixed(2);
+
+  document.getElementById('cost-amount').textContent = totalRupees;
+  document.getElementById('cost-breakdown').innerHTML = `
+    <span class="cost-pill">${state.pageCount} pages</span>
+    <span class="cost-pill">${copies} ${copies > 1 ? 'copies' : 'copy'}</span>
+    <span class="cost-pill">${color ? 'Color' : 'B&W'}</span>
+    <span class="cost-pill">${duplex ? 'Duplex' : 'Single-sided'}</span>
+    <span class="cost-pill">₹${(rate/100).toFixed(2)}/sheet</span>
+  `;
+  document.getElementById('cost-preview').classList.add('show');
+}
+
+document.getElementById('copies').addEventListener('input', updateCost);
+
+// ─── Upload ───────────────────────────────────────────────────────────────────
+async function uploadFile() {
+  if (!state.file) return toast('Please select a file.', 'error');
+
+  const email = document.getElementById('student-email').value.trim();
+  if (!email || !email.includes('@')) return toast('Please enter a valid email.', 'error');
+
+  const btn = document.getElementById('upload-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Uploading...';
+
+  const formData = new FormData();
+  formData.append('file',         state.file);
+  formData.append('studentEmail', email);
+  formData.append('studentName',  document.getElementById('student-name').value.trim());
+  formData.append('copies',       document.getElementById('copies').value);
+  formData.append('color',        document.getElementById('color').checked);
+  formData.append('duplex',       document.getElementById('duplex').checked);
+  formData.append('paperSize',    document.getElementById('paper-size').value);
+
+  try {
+    // Note: For student portal, upload doesn't require JWT in production
+    // Here we use a guest token approach — in production add student auth
+    const res = await fetch(`${API}/jobs/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${await getGuestToken()}` },
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+    state.jobId       = data.job.id;
+    state.qrToken     = data.job.qrToken;
+    state.amountPaise = data.job.amountPaise;
+    state.pageCount   = data.job.pageCount;
+
+    updateCost();
+    showPaymentScreen(data.job);
+    toast('File uploaded successfully!', 'success');
+
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Upload & Get Cost';
+  }
+}
+
+// Guest token — in production replace with student login
+async function getGuestToken() {
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email:    'admin@printq.local',
+        password: 'Admin@1234',
+      }),
+    });
+    const data = await res.json();
+    return data.accessToken;
+  } catch { return ''; }
+}
+
+// ─── Payment Screen ───────────────────────────────────────────────────────────
+function showPaymentScreen(job) {
+  const color  = document.getElementById('color').checked;
+  const duplex = document.getElementById('duplex').checked;
+
+  document.getElementById('payment-details').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--muted)">File</span>
+        <span style="font-weight:600;max-width:200px;text-align:right;word-break:break-all">${state.file?.name}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--muted)">Pages</span>
+        <span style="font-weight:600">${job.pageCount}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--muted)">Settings</span>
+        <span style="font-weight:600">${job.settings.copies} copy × ${color ? 'Color' : 'B&W'} × ${duplex ? 'Duplex' : 'Single'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:12px 0">
+        <span style="font-size:1.1rem;font-weight:700">Total</span>
+        <span style="font-size:1.4rem;font-weight:800;color:var(--primary)">₹${job.amountRupees}</span>
+      </div>
+    </div>
+  `;
+  showScreen('payment');
+}
+
+// ─── Razorpay Payment ─────────────────────────────────────────────────────────
+async function initiatePayment() {
+  const btn = document.getElementById('pay-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Creating order...';
+
+  try {
+    const token = await getGuestToken();
+    const res = await fetch(`${API}/payments/create-order`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ jobId: state.jobId }),
+    });
+
+    const order = await res.json();
+    if (!res.ok) throw new Error(order.error || 'Failed to create order');
+
+    state.orderId = order.orderId;
+
+    const options = {
+      key:         order.keyId,
+      amount:      order.amount,
+      currency:    order.currency,
+      order_id:    order.orderId,
+      name:        'PrintQ',
+      description: `Print Job — ${state.file?.name}`,
+      image:       '/icons/icon-192.png',
+      prefill: {
+        email: document.getElementById('student-email').value,
+        name:  document.getElementById('student-name').value,
+      },
+      theme: { color: '#6366f1' },
+      handler: function(response) {
+        toast('Payment successful! Generating QR...', 'success');
+        showQRScreen();
+        connectSocket();
+      },
+      modal: {
+        ondismiss: function() {
+          btn.disabled = false;
+          btn.innerHTML = '💳 Pay with Razorpay';
+          toast('Payment cancelled.', 'info');
+        }
+      }
+    };
+
+    new Razorpay(options).open();
+
+  } catch (err) {
+    toast(err.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '💳 Pay with Razorpay';
+  }
+}
+
+// ─── QR Code Screen ───────────────────────────────────────────────────────────
+async function showQRScreen() {
+  showScreen('qr');
+  document.getElementById('qr-job-id').textContent = `Job ID: ${state.jobId?.slice(0, 8)}...`;
+  await generateQRCode(state.qrToken);
+  updateTimeline('queued');
+}
+
+async function generateQRCode(token) {
+  // Simple QR via Google Charts API (replace with local jsQR in production)
+  const canvas  = document.getElementById('qr-canvas');
+  const ctx     = canvas.getContext('2d');
+  const img     = new Image();
+  const qrData  = JSON.stringify({ qrToken: token, jobId: state.jobId });
+  const encoded = encodeURIComponent(qrData);
+  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encoded}`;
+  img.onload = () => ctx.drawImage(img, 0, 0, 240, 240);
+}
+
+// ─── Socket.IO Real-time Updates ─────────────────────────────────────────────
+function connectSocket() {
+  if (state.socket) state.socket.disconnect();
+
+  state.socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+
+  state.socket.on('connect', () => {
+    state.socket.emit('join:job', state.jobId);
+    console.log('[Socket] Connected, joined job room:', state.jobId);
+  });
+
+  state.socket.on('job:status', ({ jobId, status }) => {
+    if (jobId !== state.jobId) return;
+    console.log('[Socket] Status update:', status);
+    updateTimeline(status);
+    updateStatusBadge(status);
+
+    if (status === 'completed') {
+      toast('🎉 Your document is ready to collect!', 'success', 5000);
+    } else if (status === 'printing') {
+      toast('🖨️ Printing in progress...', 'info');
+    } else if (status === 'failed') {
+      toast('❌ Print failed. Please contact support.', 'error', 5000);
+    }
+  });
+
+  state.socket.on('disconnect', () => {
+    console.log('[Socket] Disconnected');
+  });
+}
+
+// ─── Timeline ─────────────────────────────────────────────────────────────────
+const STATUS_STEPS = [
+  { key: 'pending_payment',   label: 'Payment Pending',    icon: '⏳' },
+  { key: 'payment_confirmed', label: 'Payment Confirmed',  icon: '✅' },
+  { key: 'queued',            label: 'In Queue',           icon: '📋' },
+  { key: 'processing',        label: 'Processing',         icon: '⚙️' },
+  { key: 'printing',          label: 'Printing',           icon: '🖨️' },
+  { key: 'completed',         label: 'Completed',          icon: '🎉' },
+];
+
+function updateTimeline(currentStatus) {
+  const currentIndex = STATUS_STEPS.findIndex(s => s.key === currentStatus);
+  const timeline = document.getElementById('status-timeline');
+  timeline.innerHTML = STATUS_STEPS.map((step, i) => {
+    let dotClass = '';
+    if (i < currentIndex)      dotClass = 'done';
+    else if (i === currentIndex) dotClass = currentStatus === 'failed' ? 'failed' : 'active';
+    return `
+      <div class="timeline-item">
+        <div class="timeline-dot ${dotClass}">${i < currentIndex ? '✓' : step.icon}</div>
+        <div class="timeline-content">
+          <div class="timeline-title">${step.label}</div>
+          ${i === currentIndex ? `<div class="timeline-time">Just now</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateStatusBadge(status) {
+  const map = {
+    queued:    ['badge-queued',   '📋 In Queue'],
+    printing:  ['badge-printing', '🖨️ Printing'],
+    completed: ['badge-complete', '✅ Completed'],
+    failed:    ['badge-failed',   '❌ Failed'],
+  };
+  const [cls, label] = map[status] || ['badge-pending', '⏳ Pending'];
+  document.getElementById('job-status-badge').innerHTML =
+    `<span class="badge ${cls}"><span class="badge-dot"></span>${label}</span>`;
+}
+
+// ─── QR Scanner ───────────────────────────────────────────────────────────────
+async function startScanner() {
+  showScreen('scanner');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    state.scannerStream = stream;
+    const video = document.getElementById('scanner-video');
+    video.srcObject = stream;
+    await video.play();
+    scanFrame();
+  } catch (err) {
+    toast('Camera access denied or not available.', 'error');
+  }
+}
+
+function scanFrame() {
+  const video  = document.getElementById('scanner-video');
+  const canvas = document.getElementById('scanner-canvas');
+  const ctx    = canvas.getContext('2d');
+
+  if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+    state.scannerInterval = requestAnimationFrame(scanFrame);
+    return;
+  }
+
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  // jsQR must be loaded via /jsqr.min.js
+  if (typeof jsQR !== 'undefined') {
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    if (code) {
+      stopScanner();
+      handleScanResult(code.data);
+      return;
+    }
+  }
+
+  state.scannerInterval = requestAnimationFrame(scanFrame);
+}
+
+function stopScanner() {
+  if (state.scannerStream) {
+    state.scannerStream.getTracks().forEach(t => t.stop());
+    state.scannerStream = null;
+  }
+  if (state.scannerInterval) {
+    cancelAnimationFrame(state.scannerInterval);
+    state.scannerInterval = null;
+  }
+}
+
+async function handleScanResult(rawData) {
+  try {
+    const parsed = JSON.parse(rawData);
+    const qrToken = parsed.qrToken || rawData;
+
+    const res  = await fetch(`${API}/jobs/status/${qrToken}`);
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || 'Job not found');
+
+    const job = data.job;
+    document.getElementById('scan-result').style.display = 'block';
+    document.getElementById('scan-result-content').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Status</span>
+          <span style="font-weight:600">${job.status.replace(/_/g,' ').toUpperCase()}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Pages</span>
+          <span style="font-weight:600">${job.page_count}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Amount</span>
+          <span style="font-weight:600">₹${(job.amount_paise/100).toFixed(2)}</span>
+        </div>
+      </div>
+    `;
+    toast('QR scanned successfully!', 'success');
+  } catch (err) {
+    toast('Invalid QR code: ' + err.message, 'error');
+    startScanner();
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function formatBytes(bytes) {
+  if (bytes < 1024)        return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// ─── PWA Service Worker ───────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
