@@ -110,6 +110,25 @@ router.post('/upload', requireAuth, upload.single('file'), settingsValidators, a
   }
 });
 
+// GET /api/jobs/status/:qrToken — public, used by printer bridge and student portal
+router.get('/status/:qrToken', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT j.id, j.status, j.page_count, j.settings, j.amount_paise,
+              j.original_filename, j.queued_at, j.printed_at,
+              p.status AS payment_status
+       FROM jobs j
+       LEFT JOIN payments p ON p.id = j.payment_id
+       WHERE j.qr_token = $1`,
+      [req.params.qrToken]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Job not found.' });
+    return res.json({ job: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/jobs
 router.get('/', requireAuth, async (req, res, next) => {
   const { status, limit = 50, offset = 0 } = req.query;

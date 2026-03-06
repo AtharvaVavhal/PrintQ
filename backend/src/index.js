@@ -16,7 +16,8 @@ const {
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const healthRouter = require('./routes/health');
 const authRouter   = require('./routes/auth');
-const jobsRouter   = require('./routes/jobs');
+const jobsRouter     = require('./routes/jobs');
+const paymentsRouter = require('./routes/payments');
 
 // Ensure upload directory exists
 const uploadDir = process.env.UPLOAD_DIR || './uploads';
@@ -35,6 +36,7 @@ const io = new Server(httpServer, {
   transports: ['websocket', 'polling'],
 });
 
+app.set('io', io);
 app.use((req, _res, next) => {
   req.io = io;
   next();
@@ -55,7 +57,7 @@ app.use('/api', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/jobs', jobsRouter);
 
-app.use('/api/payments', (req, res) => res.json({ message: 'Payment routes — Day 4' }));
+app.use('/api/payments', paymentsRouter);
 app.use('/api/printers', (req, res) => res.json({ message: 'Printer routes — Day 9' }));
 app.use('/api/admin',    (req, res) => res.json({ message: 'Admin routes — Day 7' }));
 
