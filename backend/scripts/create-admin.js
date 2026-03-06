@@ -1,7 +1,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 const bcrypt = require('bcryptjs');
-const pool   = require('../src/config/db');
+const { pool } = require('../src/config/db');
 
 async function main() {
   const email    = process.env.ADMIN_EMAIL    || 'admin@printq.local';
@@ -33,6 +33,7 @@ async function main() {
     process.exit(1);
   } finally {
     await pool.end();
+    process.exit(0);
   }
 }
 
