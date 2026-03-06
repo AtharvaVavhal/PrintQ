@@ -1,9 +1,10 @@
 require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
-const fs = require('fs');
+const express      = require('express');
+const http         = require('http');
+const { Server }   = require('socket.io');
+const path         = require('path');
+const fs           = require('fs');
+const cookieParser = require('cookie-parser');
 
 const {
   helmetConfig,
@@ -14,6 +15,8 @@ const {
 } = require('./middleware/security');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const healthRouter = require('./routes/health');
+const authRouter   = require('./routes/auth');
+const jobsRouter   = require('./routes/jobs');
 
 // Ensure upload directory exists
 const uploadDir = process.env.UPLOAD_DIR || './uploads';
@@ -24,7 +27,6 @@ if (!fs.existsSync(uploadDir)) {
 const app = express();
 const httpServer = http.createServer(app);
 
-// ─── Socket.IO ────────────────────────────────────────────────────────────────
 const io = new Server(httpServer, {
   cors: {
     origin: [process.env.FRONTEND_URL, process.env.STUDENT_PORTAL_URL].filter(Boolean),
@@ -33,59 +35,46 @@ const io = new Server(httpServer, {
   transports: ['websocket', 'polling'],
 });
 
-// Attach io to every request so routes can emit events
 app.use((req, _res, next) => {
   req.io = io;
   next();
 });
 
-// ─── Core Middleware ──────────────────────────────────────────────────────────
 app.use(helmetConfig);
 app.use(corsOptions);
 app.use(compression);
 app.use(morgan);
 app.use(globalLimiter);
+app.use(cookieParser());
 
-// Body parsers — raw body needed for Razorpay webhook HMAC verification
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api', healthRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/jobs', jobsRouter);
 
-// Placeholder route stubs — replaced in Day 3+
-app.use('/api/auth',     (req, res) => res.json({ message: 'Auth routes — Day 3' }));
-app.use('/api/jobs',     (req, res) => res.json({ message: 'Job routes — Day 3-4' }));
 app.use('/api/payments', (req, res) => res.json({ message: 'Payment routes — Day 4' }));
 app.use('/api/printers', (req, res) => res.json({ message: 'Printer routes — Day 9' }));
 app.use('/api/admin',    (req, res) => res.json({ message: 'Admin routes — Day 7' }));
 
-// ─── Socket.IO Events (basic) ────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`[Socket.IO] Client connected: ${socket.id}`);
-
-  // Student joins their job room to get real-time status updates
   socket.on('join:job', (jobId) => {
     socket.join(`job:${jobId}`);
-    console.log(`[Socket.IO] ${socket.id} joined room job:${jobId}`);
   });
-
-  // Admin joins printer queue room
   socket.on('join:printer', (printerId) => {
     socket.join(`printer:${printerId}`);
   });
-
   socket.on('disconnect', () => {
     console.log(`[Socket.IO] Client disconnected: ${socket.id}`);
   });
 });
 
-// ─── Error Handling (must be last) ───────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
 
-// ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 4000;
 httpServer.listen(PORT, () => {
   console.log(`
@@ -96,10 +85,8 @@ httpServer.listen(PORT, () => {
   `);
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('[Server] SIGTERM received — shutting down gracefully');
   httpServer.close(() => process.exit(0));
 });
 
-module.exports = { app, io }; // export for testing
+module.exports = { app, io };
