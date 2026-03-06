@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt  = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
 
-const pool = require('../config/db');
+const { pool } = require('../config/db');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { authLimiter } = require('../middleware/security');
 

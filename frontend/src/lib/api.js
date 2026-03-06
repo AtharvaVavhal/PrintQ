@@ -8,6 +8,7 @@ const api = axios.create({
 // Attach access token to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('printq_token');
+  config.headers['x-college-id'] = 'default';
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });

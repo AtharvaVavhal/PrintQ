@@ -761,7 +761,7 @@ async function uploadFile() {
     // Here we use a guest token approach — in production add student auth
     const res = await fetch(`${API}/jobs/upload`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${await getGuestToken()}` },
+      headers: { 'Authorization': `Bearer ${await getGuestToken()}`, 'x-college-id': 'default' },
       body: formData,
     });
 
@@ -785,19 +785,22 @@ async function uploadFile() {
   }
 }
 
-// Guest token — in production replace with student login
+// Guest token — cached to avoid rate limits
+let _cachedToken = null;
+let _tokenExpiry = 0;
+
 async function getGuestToken() {
+  if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
   try {
     const res = await fetch(`${API}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email:    'admin@printq.local',
-        password: 'Admin@1234',
-      }),
+      headers: { 'Content-Type': 'application/json', 'x-college-id': 'default' },
+      body: JSON.stringify({ email: 'admin@printq.local', password: 'Admin@1234' }),
     });
     const data = await res.json();
-    return data.accessToken;
+    _cachedToken = data.accessToken;
+    _tokenExpiry = Date.now() + 13 * 60 * 1000; // cache for 13 min
+    return _cachedToken;
   } catch { return ''; }
 }
 
@@ -842,6 +845,7 @@ async function initiatePayment() {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'x-college-id': 'default',
       },
       body: JSON.stringify({ jobId: state.jobId }),
     });
