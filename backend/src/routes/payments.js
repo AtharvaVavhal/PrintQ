@@ -7,10 +7,12 @@ const requireAuth = require('../middleware/requireAuth');
 
 const router = express.Router();
 
-const razorpay = new Razorpay({
-  key_id:     process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+function getRazorpay() {
+  return new Razorpay({
+    key_id:     process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+}
 
 // ─── POST /api/payments/create-order ─────────────────────────────────────────
 // Creates a Razorpay order for a job and stores it in the payments table.
@@ -33,7 +35,7 @@ router.post('/create-order', requireAuth, async (req, res, next) => {
     }
 
     // 2. Create Razorpay order
-    const order = await razorpay.orders.create({
+    const order = await getRazorpay().orders.create({
       amount:   job.amount_paise,
       currency: 'INR',
       receipt:  `job_${job.id.slice(0, 8)}`,
